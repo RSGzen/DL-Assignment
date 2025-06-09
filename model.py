@@ -364,9 +364,10 @@ def main():
         device = torch.device('cpu')
         print("CUDA not available. Using CPU.")
     
-    train_dir = 'C:/Users/Yip Mun Jun/Downloads/deep learning dataset/train pre'
-    test_dir = 'C:/Users/Yip Mun Jun/Downloads/deep learning dataset/test pre'
-    
+    base_dir = os.getcwd()
+    train_dir = os.path.join(base_dir, "processed_data", "train")
+    test_dir = os.path.join(base_dir, "processed_data", "test")
+
     train_transform, val_transform = get_transforms(train_dir)
     train_dataset = ImageFolder(train_dir, transform=train_transform)
     val_dataset = ImageFolder(test_dir, transform=val_transform)
@@ -385,7 +386,6 @@ def main():
             {'num_layers': 4, 'out_channels': 192, 'expand_ratio': 6, 'kernel_size': 5, 'stride': 2},
             {'num_layers': 1, 'out_channels': 320, 'expand_ratio': 6, 'kernel_size': 3, 'stride': 1},
         ]
-      
     }
     
     model = EfficientNetFER(
