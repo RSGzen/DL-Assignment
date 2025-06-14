@@ -1,0 +1,18 @@
+Accuracy Score: 44.0234
+
+Classification Report:
+              precision    recall  f1-score   support
+
+       angry       0.20      0.09      0.13       479
+     disgust       0.00      0.00      0.00        55
+        fear       0.21      0.23      0.22       512
+       happy       0.74      0.79      0.76       887
+     neutral       0.30      0.52      0.38       617
+         sad       0.35      0.15      0.21       623
+    surprise       0.56      0.73      0.63       416
+
+    accuracy                           0.44      3589
+   macro avg       0.34      0.36      0.33      3589
+weighted avg       0.42      0.44      0.41      3589
+
+Macro AUC Score (OvR): 0.6082
