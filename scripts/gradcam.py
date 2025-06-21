@@ -2,6 +2,8 @@ import os
 import torch
 import numpy as np
 import cv2
+import random
+from glob import glob
 
 from new_model_train import EfficientNet  # our EfficientNet model
 from data_preprocessing import dataPreprocessing  # Data Preprocessing
@@ -77,48 +79,72 @@ def overlay_heatmap(heatmap, image_path, alpha=0.5):
     # apply heatmap onto image
     heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
     overlay = cv2.addWeighted(image, alpha, heatmap_color, 1 - alpha, 0)
-    return overlay, image
+    return overlay
 
-#To create comparison between original image and grad-cam image
-def create_comparison_image(original, gradcam_overlay):
-    comparison = np.hstack((original, gradcam_overlay))
-    return comparison
+# Generate 3x3 gradcam grid for output images
+def generate_grid(gradcam_images, rows = 3, cols = 3):
+    height, width, _ = gradcam_images[0].shape
+    grid_image = np.zeros((rows * height, cols * width, 3), dtype=np.uint8)
+
+    for index, img in enumerate(gradcam_images):
+        row = index // cols
+        col = index % cols
+        grid_image[row * height:(row + 1) * height, col * width:(col + 1) * width, :] = img
+
+    return grid_image
 
 
 if __name__ == "__main__":
-    image_path = "PrivateTest_10629254.jpg"  # Image to be evaluated
+    test_folders = ["neutral", "happy", "sad", "angry", "disgust", "fear", "surprise"]
+    base = "raw_data/test"
+    test_images = []  # Images to be evaluated
+
+    # Get 1 image per emotion class
+    for i in test_folders:
+        test_path = os.path.join(base, i)
+        image_list = glob(os.path.join(test_path, "*.jpg"))
+        test_images.append(random.choice(image_list))
+
+    # Add 2 extra random images
+    all_images = glob(os.path.join(base, "*/*.jpg"))
+    remaining_images = list(set(all_images) - set(test_images))
+    extra_images = random.sample(remaining_images, 2) if len(remaining_images) >= 2 else remaining_images
+
+    image_paths = test_images + extra_images
+    random.shuffle(image_paths)
+
     output_dir = "outputs"
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load model and weights (parameters)
+    # Load model
     model = EfficientNet(num_classes=7)
-    model.load_state_dict(torch.load("model_2.pth", map_location="cpu"))
-
-    # Image Preprocessing
-    input_tensor = dataPreprocessing(image_path).unsqueeze(0)
+    model.load_state_dict(torch.load("efficientnetb0.pth", map_location="cpu"))
+    model.eval()
 
     # Select target layer (Choose Last Convolutional Block)
     target_layer = model.blocks[-1]
     grad_cam = GradCAM(model, target_layer)
 
     # Generate gradcam heatmap
-    heatmap = grad_cam.compute_gradcam(input_tensor)
-    gradcam_image, original_image = overlay_heatmap(heatmap, image_path)
+    gradcam_images = []
 
-    # Create comparison image
-    comparison_image = create_comparison_image(original_image, gradcam_image)
+    for path in image_paths:
+        # Image Preprocessing
+        input_tensor = dataPreprocessing(path).unsqueeze(0)
+        # Generate heatmap
+        heatmap = grad_cam.compute_gradcam(input_tensor)
+        overlay = overlay_heatmap(heatmap, path)
+        if overlay is not None:
+            gradcam_images.append(overlay)
 
     # Save images to "outputs" folder
-    gradcam_path = os.path.join(output_dir, "gradcam.jpg")
-    comparison_path = os.path.join(output_dir, "gradcam_comparison.jpg")
-    cv2.imwrite(gradcam_path, gradcam_image)
-    cv2.imwrite(comparison_path, comparison_image)
-
-    print(f"GradCam output saved at {gradcam_path}")
-    print(f"Comparison saved at {comparison_path}")
+    grid_image = generate_grid(gradcam_images, rows=3, cols=3)
+    grid_output_path = os.path.join(output_dir, "gradcam.jpg")
+    cv2.imwrite(grid_output_path, grid_image)
+    print(f"GradCam saved at {grid_output_path}")
 
     # Display GradCam
-    cv2.imshow("GradCAM Comparison", comparison_image)
+    cv2.imshow("GradCAM", grid_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
