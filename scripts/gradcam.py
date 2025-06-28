@@ -6,7 +6,7 @@ import random
 from glob import glob
 
 from new_model_train import EfficientNet  # our EfficientNet model
-from data_preprocessing import dataPreprocessing  # Data Preprocessing
+from data_processing import dataPreprocessing # Data Preprocessing
 
 class GradCAM:
     def __init__(self, model, target_layer):
@@ -81,15 +81,28 @@ def overlay_heatmap(heatmap, image_path, alpha=0.5):
     overlay = cv2.addWeighted(image, alpha, heatmap_color, 1 - alpha, 0)
     return overlay
 
-# Generate 3x3 gradcam grid for output images
-def generate_grid(gradcam_images, rows = 3, cols = 3):
+# Generate Gradcam for each class
+def generate_grid(gradcam_images, labels, rows, cols):
     height, width, _ = gradcam_images[0].shape
-    grid_image = np.zeros((rows * height, cols * width, 3), dtype=np.uint8)
+    label_width = 150
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.7
+    thickness = 2
+    color = (255, 255, 255)
 
-    for index, img in enumerate(gradcam_images):
-        row = index // cols
-        col = index % cols
-        grid_image[row * height:(row + 1) * height, col * width:(col + 1) * width, :] = img
+    grid_image = np.zeros((rows * height, label_width + cols * width, 3), dtype=np.uint8)
+
+    for row in range(rows):
+        y_pos = row * height + height // 2 + 10
+        label = labels[row]
+        cv2.putText(grid_image, label, (10, y_pos), font, font_scale, color, thickness, cv2.LINE_AA)
+
+    for idx, img in enumerate(gradcam_images):
+        row = idx // cols
+        col = idx % cols
+        y_start = row * height
+        x_start = label_width + col * width
+        grid_image[y_start:y_start + height, x_start:x_start + width] = img
 
     return grid_image
 
@@ -98,20 +111,15 @@ if __name__ == "__main__":
     test_folders = ["neutral", "happy", "sad", "angry", "disgust", "fear", "surprise"]
     base = "raw_data/test"
     test_images = []  # Images to be evaluated
+    emotion_labels = []
 
-    # Get 1 image per emotion class
+    # Get 6 images per class
     for i in test_folders:
         test_path = os.path.join(base, i)
         image_list = glob(os.path.join(test_path, "*.jpg"))
-        test_images.append(random.choice(image_list))
-
-    # Add 2 extra random images
-    all_images = glob(os.path.join(base, "*/*.jpg"))
-    remaining_images = list(set(all_images) - set(test_images))
-    extra_images = random.sample(remaining_images, 2) if len(remaining_images) >= 2 else remaining_images
-
-    image_paths = test_images + extra_images
-    random.shuffle(image_paths)
+        selected_images = random.sample(image_list, min(6, len(image_list)))
+        test_images.extend(selected_images)
+        emotion_labels.extend([i.capitalize()] * len(selected_images))  # e.g. ["Happy", "Happy", "Happy"]
 
     output_dir = "outputs"
     os.makedirs(output_dir, exist_ok=True)
@@ -128,7 +136,7 @@ if __name__ == "__main__":
     # Generate gradcam heatmap
     gradcam_images = []
 
-    for path in image_paths:
+    for path in test_images:
         # Image Preprocessing
         input_tensor = dataPreprocessing(path).unsqueeze(0)
         # Generate heatmap
@@ -137,8 +145,11 @@ if __name__ == "__main__":
         if overlay is not None:
             gradcam_images.append(overlay)
 
+    row_labels = test_folders
+    row_labels = [label.capitalize() for label in row_labels]  # Capitalized names
+
     # Save images to "outputs" folder
-    grid_image = generate_grid(gradcam_images, rows=3, cols=3)
+    grid_image = generate_grid(gradcam_images, labels = row_labels, rows=7, cols=6)
     grid_output_path = os.path.join(output_dir, "gradcam.jpg")
     cv2.imwrite(grid_output_path, grid_image)
     print(f"GradCam saved at {grid_output_path}")
