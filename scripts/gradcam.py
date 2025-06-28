@@ -119,7 +119,7 @@ if __name__ == "__main__":
         image_list = glob(os.path.join(test_path, "*.jpg"))
         selected_images = random.sample(image_list, min(6, len(image_list)))
         test_images.extend(selected_images)
-        emotion_labels.extend([i.capitalize()] * len(selected_images))  # e.g. ["Happy", "Happy", "Happy"]
+        emotion_labels.extend([i.capitalize()] * len(selected_images)) 
 
     output_dir = "outputs"
     os.makedirs(output_dir, exist_ok=True)
